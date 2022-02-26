@@ -6,12 +6,33 @@
 #include <malloc.h>
 #include <sys/mman.h>
 #include <x86intrin.h>
+#include <immintrin.h>
 #include <pthread.h>
 
 static char* buffer;
 static uint64_t total = 100000;
 static void* function_pointer(void* arg);
 static uint64_t test(void);
+
+#define INVPCID_TYPE_INDIV_ADDR		    0
+#define INVPCID_TYPE_SINGLE_CTXT	    1
+#define INVPCID_TYPE_ALL_INCL_GLOBAL	2
+#define INVPCID_TYPE_ALL_NON_GLOBAL	    3
+
+static inline void __invpcid(unsigned long pcid, unsigned long addr,
+			     unsigned long type)
+{
+	struct { uint64_t d[2]; } desc = { { pcid, addr } };
+
+	/*
+	 * The memory clobber is because the whole point is to invalidate
+	 * stale TLB entries and, especially if we're flushing global
+	 * mappings, we don't want the compiler to reorder any subsequent
+	 * memory accesses before the TLB flush.
+	 */
+	asm volatile("invpcid %[desc], %[type]"
+		     :: [desc] "m" (desc), [type] "r" (type) : "memory");
+}
 
 int main() {
     uint64_t avg = 0;
@@ -25,11 +46,12 @@ int main() {
     printf("average time is %ld\n", avg / count / total / 2);
     return 1;
 
-    //                          null       math       th_null      th_math
-    // basic                  | 2        | 2336     | 10         | 3392
-    // mprot                  | 2543     | 4759     | 2885       | 7658
-    // 1 sw cycle consumption | 2541     | 2423     | 2875       | 4226
-    // 1 core extra shootdown | < 500    | < 500    | 2000       | 600000
+    //                          null       math       pid     th_null      th_math   th_pid
+    // basic                  | 2        | 2336     | 439   | 10         | 3392    | 803
+    // mprot                  | 2543     | 4759     | 3097  | 2885       | 7658    | 3777
+    // invpcid.2(pcid wo g)   | 
+    // 1 sw cycle consumption | 2541     | 2423     | 2658  | 2875       | 4226    | 2974
+    // 1 core extra shootdown | < 500    | < 500    | < 500 | 2000       | 600000  | 2000+
     // if 1 core has 1 extra shootdown, 6000 cycles will be consumed
 }
 
