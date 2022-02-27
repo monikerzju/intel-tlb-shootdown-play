@@ -1,21 +1,20 @@
 CC     := gcc
-CFLAGS := -O0
+CFLAGS := -O1
 CLIBS  := -lm -lpthread
-SRC    := mprotect.c
 DEST_D := build/
+SRC_D  := src/
+INC_D  := include/
+SRC     := $(wildcard $(SRC_D)*.c)
+OBJ     := $(patsubst $(SRC_D)%.c,$(DEST_D)%.o,$(SRC))
 
 default: run
 
-all: mprotect.c
+$(DEST_D)%.o: $(SRC_D)%.c
 	mkdir -p $(DEST_D)
-	$(CC) $(CFLAGS) -DWMATH $(SRC) -o $(DEST_D)math_basic $(CLIBS)
-	$(CC) $(CFLAGS) -DWMATH -DSWITCH $(SRC) -o $(DEST_D)math_mprot $(CLIBS)
-	$(CC) $(CFLAGS) $(SRC) -o $(DEST_D)basic $(CLIBS)
-	$(CC) $(CFLAGS) -DSWITCH $(SRC) -o $(DEST_D)mprot $(CLIBS)
-	$(CC) $(CFLAGS) -DWTHREAD -DWMATH $(SRC) -o $(DEST_D)thread_math_basic $(CLIBS)
-	$(CC) $(CFLAGS) -DWTHREAD -DWMATH -DSWITCH $(SRC) -o $(DEST_D)thread_math_mprot $(CLIBS)
-	$(CC) $(CFLAGS) -DWTHREAD $(SRC) -o $(DEST_D)thread_basic $(CLIBS)
-	$(CC) $(CFLAGS) -DWTHREAD -DSWITCH $(SRC) -o $(DEST_D)thread_mprot $(CLIBS)
+	$(CC) $(CFLAGS) -I$(INC_D) -c $< -o $@ $(CLIBS)
+
+all: $(SRC_D) $(INC_D) $(OBJ)
+	$(CC) $(CFLAGS) -I$(INC_D) $(OBJ) -o $(DEST_D)testelf $(CLIBS)
 
 run: all
 	./run.sh
